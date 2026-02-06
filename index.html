@@ -3,8 +3,158 @@
 <head>
   <meta charset="UTF-8">
   <title>Cadre photo</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    header { padding: 10px; background: #222; color: #fff; }
+    main { padding: 10px; display: flex; flex-direction: column; gap: 20px; }
+    section { border: 1px solid #ddd; padding: 10px; border-radius: 6px; }
+    #slideshow img { max-width: 100%; max-height: 60vh; object-fit: contain; background: #000; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 5px; }
+  </style>
 </head>
 <body>
-  <h1>Cadre photo</h1>
+  <header>
+    <h1>Cadre photo connecté</h1>
+  </header>
+
+  <main>
+    <section>
+      <h2>Ajouter une photo</h2>
+      <input type="file" id="fileInput" accept="image/*">
+      <button id="uploadBtn">Uploader</button>
+    </section>
+
+    <section>
+      <h2>Photos actuelles</h2>
+      <ul id="photoList"></ul>
+    </section>
+
+    <section>
+      <h2>Diaporama</h2>
+      <div id="slideshow">
+        <img id="slide" src="">
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    // 👉 Colle ici ton firebaseConfig
+   
+const firebaseConfig = {
+  apiKey: "AIzaSyD8v7XRX7McWmDMcCEPZRY7MaMvvDZjW4w",
+  authDomain: "cadre-photos-eb6fd.firebaseapp.com",
+  projectId: "cadre-photos-eb6fd",
+  storageBucket: "cadre-photos-eb6fd.firebasestorage.app",
+  messagingSenderId: "1003429668013",
+  appId: "1:1003429668013:web:fbf9e57be077bac3189224"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const configRef = doc(db, "config", "slideshow");
+
+    async function ensureConfig() {
+      const snap = await getDoc(configRef);
+      if (!snap.exists()) {
+        await setDoc(configRef, { photos: [], interval: 5000 });
+      }
+    }
+
+    const fileInput = document.getElementById("fileInput");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const photoList = document.getElementById("photoList");
+    const slide = document.getElementById("slide");
+
+    // Upload vers GitHub via API
+    async function uploadToGitHub(file) {
+      const repo = "LeLordMD/cadre-photo";
+      const path = "photos/" + Date.now() + "_" + file.name;
+
+      const content = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(content)));
+
+      const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        method: "PUT",
+        headers: {
+          "Authorization": "Bearer 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",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Add photo",
+          content: base64
+        })
+      });
+
+      const json = await res.json();
+      return `https://raw.githubusercontent.com/${repo}/main/${path}`;
+    }
+
+    uploadBtn.onclick = async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      await ensureConfig();
+
+      const url = await uploadToGitHub(file);
+
+      const snap = await getDoc(configRef);
+      const photos = snap.data().photos;
+      photos.push(url);
+
+      await updateDoc(configRef, { photos });
+      fileInput.value = "";
+    };
+
+    function renderList(photos) {
+      photoList.innerHTML = "";
+      photos.forEach((url, i) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<a href="${url}" target="_blank">Photo ${i+1}</a> 
+                        <button data-i="${i}">Supprimer</button>`;
+        photoList.appendChild(li);
+      });
+
+      photoList.querySelectorAll("button").forEach(btn => {
+        btn.onclick = async () => {
+          const snap = await getDoc(configRef);
+          const photos = snap.data().photos;
+          photos.splice(btn.dataset.i, 1);
+          await updateDoc(configRef, { photos });
+        };
+      });
+    }
+
+    let timer = null;
+    function startSlideshow(photos, interval) {
+      if (timer) clearInterval(timer);
+      if (photos.length === 0) {
+        slide.src = "";
+        return;
+      }
+      let i = 0;
+      slide.src = photos[0];
+      timer = setInterval(() => {
+        i = (i + 1) % photos.length;
+        slide.src = photos[i];
+      }, interval);
+    }
+
+    onSnapshot(configRef, snap => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      renderList(data.photos);
+      startSlideshow(data.photos, data.interval);
+    });
+
+    ensureConfig();
+  </script>
 </body>
 </html>
