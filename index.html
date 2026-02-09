@@ -75,7 +75,7 @@ const app = initializeApp(firebaseConfig);
 
     // Upload vers GitHub via API
     async function uploadToGitHub(file) {
-      const repo = "LeLordMD/cadre-photo";
+      const repo = "LeLordMD/cadre_photo";
       const path = "photos/" + Date.now() + "_" + file.name;
 
       const content = await file.arrayBuffer();
@@ -84,7 +84,7 @@ const app = initializeApp(firebaseConfig);
       const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
         method: "PUT",
         headers: {
-          "Authorization": "Bearer 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",
+          "Authorization": "Bearer " + GITHUB_TOKEN,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -158,3 +158,4 @@ const app = initializeApp(firebaseConfig);
   </script>
 </body>
 </html>
+
